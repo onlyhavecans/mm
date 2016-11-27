@@ -18,7 +18,7 @@ var (
 	debug_mode        bool
 )
 
-func debug_log(log string) {
+func debug_log(log ...string) {
 	if debug_mode {
 		fmt.Println(log)
 	}
@@ -45,20 +45,42 @@ func init_vars() {
 
 	debug_log("Name:", connection_name)
 	debug_log("Server:", connection_server)
-	debug_log("Port:", connection_port)
-	debug_log("SSL?:", use_ssl)
+	debug_log("Port:", strconv.Itoa(int(connection_port)))
+	debug_log("SSL?:", strconv.FormatBool(use_ssl))
+}
+
+func get_muck_dir() string {
+	var muck_dir string
+	if dir, err := homedir.Expand(main_dir); err == nil {
+		muck_dir = dir
+	} else {
+		fmt.Println("unable to expand home dir")
+		os.Exit(10)
+	}
+	debug_log("muckdir", muck_dir)
+
+	return muck_dir
 }
 
 func move_to_main_directory() {
-	muck_dir = homedir.Expand(main_dir)
-	debug_log("muckdir", muckdir)
+	muck_dir := get_muck_dir()
+	if _, err := os.Stat(muck_dir); os.IsNotExist(err) {
+		if err := os.Mkdir(muck_dir); err != nil {
+			fmt.Printf("Unable to make non-existant dir %v\n", muck_dir)
+			os.Exit(10)
+		}
+	}
+	if err := os.Chdir(muck_dir); err != nil {
+		fmt.Printf("Unable to chdir to %v\n", muck_dir)
+		os.Exit(10)
+	}
 }
 
 func main() {
 	//set up settings
 	init_vars()
 
-	os.Chdir(main_dir)
+	move_to_main_directory()
 	//defer clean up connection, in, and roll out
 
 	//create connection
