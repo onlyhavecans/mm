@@ -10,11 +10,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 const base_dir string = "muck"
 const in_file string = "in"
-const outfile string = "out"
+const out_file string = "out"
 
 var (
 	connection_name   string
@@ -28,6 +29,10 @@ func debug_log(log ...string) {
 	if debug_mode {
 		fmt.Println(log)
 	}
+}
+
+func get_timestamp() string {
+	return time.Now().Format("2006-01-02T150405")
 }
 
 func init_vars() {
@@ -95,8 +100,16 @@ func make_in(file string) {
 	}
 }
 
+func open_connection(server string) net.Conn {
+	if conn, err := net.Dial("tcp", server); err != nil {
+		log.Fatal("Unable to connect: ", err)
+	} else {
+		return connection
+	}
+}
+
 func main() {
-	//set up settings
+	fmt.Println("Started at", get_timestamp())
 	init_vars()
 
 	working_dir := get_working_dir(base_dir, connection_name)
@@ -104,9 +117,13 @@ func main() {
 
 	make_in(in_file)
 	defer syscall.Unlink(in_file)
-	//defer clean up connection, in, and roll out
 
-	//create connection
+	//create connection with in_file to write and out_file to read
+	connection_string := fmt.Sprintf("%s:%d", connection_server, connection_port)
+	connection := open_connection()
 
-	//create in
+	defer connection.Close()
+
+	//defer rolling out
+
 }
