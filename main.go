@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/mitchellh/go-homedir"
-	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,7 +20,7 @@ const out_file string = "out"
 var (
 	connection_name   string
 	connection_server string
-	connection_port   uint16
+	connection_port   uint
 	use_ssl           bool
 	debug_mode        bool
 )
@@ -28,6 +28,13 @@ var (
 func debug_log(log ...string) {
 	if debug_mode {
 		fmt.Println(log)
+	}
+}
+
+func check_error(err error) {
+	if err != nil {
+		fmt.Println("Fatal error ", err.Error())
+		os.Exit(1)
 	}
 }
 
@@ -42,15 +49,14 @@ func init_vars() {
 
 	connection_args := flag.Args()
 	if len(connection_args) != 3 {
-		log.Fatal("Usage: mm [--ssl] [--debug] <name> <server> <port>")
+		fmt.Println("Usage: mm [--ssl] [--debug] <name> <server> <port>")
+		os.Exit(1)
 	}
 	connection_name = connection_args[0]
 	connection_server = connection_args[1]
-	if s, err := strconv.Atoi(connection_args[2]); err == nil {
-		connection_port = uint16(s)
-	} else {
-		log.Fatal("Port must be a number 1 - 65535")
-	}
+	s, err := strconv.Atoi(connection_args[2])
+	check_error(err)
+	connection_port = uint(s)
 
 	debug_log("Name:", connection_name)
 	debug_log("Server:", connection_server)
@@ -61,25 +67,20 @@ func init_vars() {
 func get_working_dir(base string, connection string) string {
 	var home string
 
-	if dir, err := homedir.Dir(); err == nil {
-		home = dir
-		debug_log("Home directory", home)
-	} else {
-		log.Fatal("unable to expand home dir")
-	}
+	home, err := homedir.Dir()
+	check_error(err)
+	debug_log("Home directory", home)
 
 	working := filepath.Join(home, base, connection)
 	return working
 }
 
 func move_to_dir(directory string) {
-	if err := os.MkdirAll(directory, 0755); err != nil {
-		log.Fatalf("Unable to make connection directory %v\n", directory)
-	}
+	err := os.MkdirAll(directory, 0755)
+	check_error(err)
 
-	if err := os.Chdir(directory); err != nil {
-		log.Fatalf("Unable to chdir to %v\n", directory)
-	}
+	err = os.Chdir(directory)
+	check_error(err)
 }
 
 func make_in(file string) {
@@ -88,24 +89,24 @@ func make_in(file string) {
 		fmt.Println("if you run multiple connection with the same name you're gonna have a bad time")
 		fmt.Print("Type YES to unlink and recreate: ")
 		input := bufio.NewReader(os.Stdin)
-		if answer, err := input.ReadString('\n'); err != nil || answer != "YES" {
-			log.Fatal("Canceling. Please remove FIFO before running")
-		} else {
+		answer, err := input.ReadString('\n')
+		check_error(err)
+		if answer == "YES" {
 			syscall.Unlink(file)
+		} else {
+			fmt.Println("Canceling. Please remove FIFO before running")
+			os.Exit(1)
 		}
 	}
 
-	if err := syscall.Mkfifo(file, 0644); err != nil {
-		log.Fatalf("Unable to make FIFO %v", file)
-	}
+	err := syscall.Mkfifo(file, 0644)
+	check_error(err)
 }
 
 func open_connection(server string) net.Conn {
-	if conn, err := net.Dial("tcp", server); err != nil {
-		log.Fatal("Unable to connect: ", err)
-	} else {
-		return connection
-	}
+	connection, err := net.Dial("tcp", server)
+	check_error(err)
+	return connection
 }
 
 func main() {
@@ -120,7 +121,7 @@ func main() {
 
 	//create connection with in_file to write and out_file to read
 	connection_string := fmt.Sprintf("%s:%d", connection_server, connection_port)
-	connection := open_connection()
+	connection := open_connection(connection_string)
 
 	defer connection.Close()
 
