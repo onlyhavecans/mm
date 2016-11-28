@@ -67,8 +67,6 @@ func initVars() {
 }
 
 func getWorkingDir(main string, sub string) string {
-	var home string
-
 	h, err := homedir.Dir()
 	checkError(err)
 	debugLog("Home directory", h)
