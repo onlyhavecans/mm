@@ -4,85 +4,87 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/mitchellh/go-homedir"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
+
+	"path/filepath"
+
+	"github.com/mitchellh/go-homedir"
 )
 
-const base_dir string = "muck"
-const in_file string = "in"
-const out_file string = "out"
+const baseDir string = "muck"
+const inFile string = "in"
+const outFile string = "out"
 
 var (
-	connection_name   string
-	connection_server string
-	connection_port   uint
-	use_ssl           bool
-	debug_mode        bool
+	connectionName   string
+	connectionServer string
+	connectionPort   uint
+	useSSL           bool
+	debugMode        bool
 )
 
-func debug_log(log ...string) {
-	if debug_mode {
+func debugLog(log ...string) {
+	if debugMode {
 		fmt.Println(log)
 	}
 }
 
-func check_error(err error) {
+func checkError(err error) {
 	if err != nil {
 		fmt.Println("Fatal error ", err.Error())
 		os.Exit(1)
 	}
 }
 
-func get_timestamp() string {
+func getTimestamp() string {
 	return time.Now().Format("2006-01-02T150405")
 }
 
-func init_vars() {
-	flag.BoolVar(&use_ssl, "ssl", false, "Enable ssl")
-	flag.BoolVar(&debug_mode, "debug", false, "Enable debug")
+func initVars() {
+	flag.BoolVar(&useSSL, "ssl", false, "Enable ssl")
+	flag.BoolVar(&debugMode, "debug", false, "Enable debug")
 	flag.Parse()
 
-	connection_args := flag.Args()
-	if len(connection_args) != 3 {
+	args := flag.Args()
+	if len(args) != 3 {
 		fmt.Println("Usage: mm [--ssl] [--debug] <name> <server> <port>")
 		os.Exit(1)
 	}
-	connection_name = connection_args[0]
-	connection_server = connection_args[1]
-	s, err := strconv.Atoi(connection_args[2])
-	check_error(err)
-	connection_port = uint(s)
+	connectionName = args[0]
+	connectionServer = args[1]
+	port, err := strconv.Atoi(args[2])
+	checkError(err)
+	connectionPort = uint(port)
 
-	debug_log("Name:", connection_name)
-	debug_log("Server:", connection_server)
-	debug_log("Port:", strconv.Itoa(int(connection_port)))
-	debug_log("SSL?:", strconv.FormatBool(use_ssl))
+	debugLog("Name:", connectionName)
+	debugLog("Server:", connectionServer)
+	debugLog("Port:", strconv.Itoa(int(connectionPort)))
+	debugLog("SSL?:", strconv.FormatBool(useSSL))
 }
 
-func get_working_dir(base string, connection string) string {
+func getWorkingDir(base string, connection string) string {
 	var home string
 
 	home, err := homedir.Dir()
-	check_error(err)
-	debug_log("Home directory", home)
+	checkError(err)
+	debugLog("Home directory", home)
 
 	working := filepath.Join(home, base, connection)
 	return working
 }
 
-func make_in(file string) {
+func makeInFIFO(file string) {
 	if _, err := os.Stat(file); err == nil {
 		fmt.Println("FIFO already exists. Unlink or exit")
 		fmt.Println("if you run multiple connection with the same name you're gonna have a bad time")
 		fmt.Print("Type YES to unlink and recreate: ")
 		input := bufio.NewReader(os.Stdin)
 		answer, err := input.ReadString('\n')
-		check_error(err)
+		checkError(err)
 		if answer == "YES" {
 			syscall.Unlink(file)
 		} else {
@@ -92,37 +94,50 @@ func make_in(file string) {
 	}
 
 	err := syscall.Mkfifo(file, 0644)
-	check_error(err)
+	checkError(err)
+}
+
+func readToOutfile(conn net.TCPConn, file os.File) {
+
 }
 
 func main() {
-	fmt.Println("~Started at", get_timestamp())
-	init_vars()
+	fmt.Println("~Started at", getTimestamp())
+	initVars()
 
 	// Make and move to working directory
-	working_dir := get_working_dir(base_dir, connection_name)
-	errMk := os.MkdirAll(working_dir, 0755)
-	check_error(errMk)
+	workingDir := getWorkingDir(baseDir, connectionName)
+	errMk := os.MkdirAll(workingDir, 0755)
+	checkError(errMk)
 
-	errCh := os.Chdir(working_dir)
-	check_error(errCh)
+	errCh := os.Chdir(workingDir)
+	checkError(errCh)
 
 	// Make the in FIFO
-	make_in(in_file)
-	defer syscall.Unlink(in_file)
+	makeInFIFO(inFile)
+	defer syscall.Unlink(inFile)
 
-	//create connection with in_file to write and out_file to read
-	connection_string := fmt.Sprintf("%s:%d", connection_server, connection_port)
-	connection, errCon := net.Dial("tcp", connection_string)
-	check_error(errCon)
-	fmt.Println("~Connected at", get_timestamp())
+	//create connection with inFile to write and outFile to read
+	connectionString := fmt.Sprintf("%s:%d", connectionServer, connectionPort)
+	tcpAddress, errRes := net.ResolveTCPAddr("tcp4", connectionString)
+	checkError(errRes)
+
+	connection, errCon := net.DialTCP("tcp", nil, tcpAddress)
+	checkError(errCon)
+	fmt.Println("~Connected at", getTimestamp())
 	defer connection.Close()
 
-	out, errOut := os.Create(out_file)
-	check_error(errOut)
+	// We keep alive for mucks
+	errSka = connection.SetKeepAlive(true)
+	checkError(errSka)
+	var keepalive time.Duration = 15 * time.Minute
+	errSkap = connection.SetKeepAlivePeriod(keepalive)
+
+	out, errOut := os.Create(outFile)
+	checkError(errOut)
 	defer out.Close()
 
-	go read_to_outfile(connection, out)
+	go readToOutfile(connection, out)
 
 	//defer rolling out
 
