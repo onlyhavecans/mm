@@ -56,9 +56,9 @@ func initVars() {
 	}
 	connectionName = args[0]
 	connectionServer = args[1]
-	port, err := strconv.Atoi(args[2])
+	p, err := strconv.Atoi(args[2])
 	checkError(err)
-	connectionPort = uint(port)
+	connectionPort = uint(p)
 
 	debugLog("Name:", connectionName)
 	debugLog("Server:", connectionServer)
@@ -66,15 +66,15 @@ func initVars() {
 	debugLog("SSL?:", strconv.FormatBool(useSSL))
 }
 
-func getWorkingDir(base string, connection string) string {
+func getWorkingDir(main string, sub string) string {
 	var home string
 
-	home, err := homedir.Dir()
+	h, err := homedir.Dir()
 	checkError(err)
-	debugLog("Home directory", home)
+	debugLog("Home directory", h)
 
-	working := filepath.Join(home, base, connection)
-	return working
+	w := filepath.Join(h, main, sub)
+	return w
 }
 
 func makeInFIFO(file string) {
@@ -82,15 +82,14 @@ func makeInFIFO(file string) {
 		fmt.Println("FIFO already exists. Unlink or exit")
 		fmt.Println("if you run multiple connection with the same name you're gonna have a bad time")
 		fmt.Print("Type YES to unlink and recreate: ")
-		input := bufio.NewReader(os.Stdin)
-		answer, err := input.ReadString('\n')
+		i := bufio.NewReader(os.Stdin)
+		a, err := i.ReadString('\n')
 		checkError(err)
-		if answer == "YES" {
-			syscall.Unlink(file)
-		} else {
+		if a != "YES" {
 			fmt.Println("Canceling. Please remove FIFO before running")
 			os.Exit(1)
 		}
+		syscall.Unlink(file)
 	}
 
 	err := syscall.Mkfifo(file, 0644)
@@ -118,23 +117,23 @@ func main() {
 	defer syscall.Unlink(inFile)
 
 	//create connection with inFile to write and outFile to read
-	connectionString := fmt.Sprintf("%s:%d", connectionServer, connectionPort)
-	tcpAddress, errRes := net.ResolveTCPAddr("tcp4", connectionString)
-	checkError(errRes)
-
-	connection, errCon := net.DialTCP("tcp", nil, tcpAddress)
-	checkError(errCon)
+	connStr := fmt.Sprintf("%s:%d", connectionServer, connectionPort)
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", connStr)
+	checkError(err)
+	connection, err := net.DialTCP("tcp", nil, tcpAddr)
+	checkError(err)
 	fmt.Println("~Connected at", getTimestamp())
 	defer connection.Close()
 
 	// We keep alive for mucks
-	errSka = connection.SetKeepAlive(true)
+	errSka := connection.SetKeepAlive(true)
 	checkError(errSka)
 	var keepalive time.Duration = 15 * time.Minute
-	errSkap = connection.SetKeepAlivePeriod(keepalive)
+	errSkap := connection.SetKeepAlivePeriod(keepalive)
+	checkError(errSkap)
 
-	out, errOut := os.Create(outFile)
-	checkError(errOut)
+	out, err := os.Create(outFile)
+	checkError(err)
 	defer out.Close()
 
 	go readToOutfile(connection, out)
