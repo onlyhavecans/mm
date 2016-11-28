@@ -75,14 +75,6 @@ func get_working_dir(base string, connection string) string {
 	return working
 }
 
-func move_to_dir(directory string) {
-	err := os.MkdirAll(directory, 0755)
-	check_error(err)
-
-	err = os.Chdir(directory)
-	check_error(err)
-}
-
 func make_in(file string) {
 	if _, err := os.Stat(file); err == nil {
 		fmt.Println("FIFO already exists. Unlink or exit")
@@ -103,27 +95,34 @@ func make_in(file string) {
 	check_error(err)
 }
 
-func open_connection(server string) net.Conn {
-	connection, err := net.Dial("tcp", server)
-	check_error(err)
-	return connection
-}
-
 func main() {
-	fmt.Println("Started at", get_timestamp())
+	fmt.Println("~Started at", get_timestamp())
 	init_vars()
 
+	// Make and move to working directory
 	working_dir := get_working_dir(base_dir, connection_name)
-	move_to_dir(working_dir)
+	errMk := os.MkdirAll(working_dir, 0755)
+	check_error(errMk)
 
+	errCh := os.Chdir(working_dir)
+	check_error(errCh)
+
+	// Make the in FIFO
 	make_in(in_file)
 	defer syscall.Unlink(in_file)
 
 	//create connection with in_file to write and out_file to read
 	connection_string := fmt.Sprintf("%s:%d", connection_server, connection_port)
-	connection := open_connection(connection_string)
-
+	connection, errCon := net.Dial("tcp", connection_string)
+	check_error(errCon)
+	fmt.Println("~Connected at", get_timestamp())
 	defer connection.Close()
+
+	out, errOut := os.Create(out_file)
+	check_error(errOut)
+	defer out.Close()
+
+	go read_to_outfile(connection, out)
 
 	//defer rolling out
 
