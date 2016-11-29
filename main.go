@@ -76,7 +76,7 @@ func getWorkingDir(main string, sub string) string {
 	return w
 }
 
-func setupConnection(s string) *net.TCPConn {
+func setupConnection(s string) net.Conn {
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", s)
 	checkError(err)
 	debugLog("server resolves to", tcpAddr)
