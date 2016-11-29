@@ -35,8 +35,8 @@ func debugLog(log ...interface{}) {
 
 func checkError(err error) {
 	if err != nil {
-		fmt.Println("fatal error", err.Error())
-		os.Exit(3162)
+		s := fmt.Sprintln("fatal error", err.Error())
+		panic(s)
 	}
 }
 
@@ -106,32 +106,47 @@ func makeFIFO(file string) *os.File {
 		}
 		errUn := syscall.Unlink(file)
 		checkError(errUn)
+		debugLog(file, "unlinked")
 	}
 
 	err := syscall.Mkfifo(file, 0644)
 	checkError(err)
+	debugLog("FIFO created as", file)
 	f, err := os.Open(file)
 	checkError(err)
+	debugLog("FIFO opened as", f.Name())
 	return f
 }
-func readtoConn(f *os.File, c *net.TCPConn) {
+
+func readtoConn(f *os.File, c *net.TCPConn, quit chan bool) {
 	for {
-		buf := make([]byte, 512)
-		bi, err := f.Read(buf)
-		checkError(err)
-		debugLog(bi, "bytes read from FIFO")
-		bo, err := c.Write(buf[:bi])
-		checkError(err)
-		debugLog(bo, "bytes written to file")
+		select {
+		case <-quit:
+			return
+		default:
+			buf := make([]byte, 512)
+			bi, err := f.Read(buf)
+			if err != nil && err.Error() != "EOF" {
+				checkError(err)
+			}
+			if bi == 0 {
+				continue
+			}
+			debugLog(bi, "bytes read from FIFO")
+			bo, err := c.Write(buf[:bi])
+			checkError(err)
+			debugLog(bo, "bytes written to file")
+		}
 	}
 }
 
-func readToFile(c *net.TCPConn, f *os.File) {
+func readToFile(c *net.TCPConn, f *os.File, quit chan bool) {
 	for {
 		buf := make([]byte, 512)
 		bi, err := c.Read(buf)
 		if err != nil {
-			continue
+			fmt.Println("Connection broken,", err.Error())
+			quit <- true
 		}
 		debugLog(bi, "bytes read from connection")
 
@@ -179,6 +194,12 @@ func closeLog(f *os.File) {
 }
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered", r)
+		}
+	}()
+
 	fmt.Println("~Started at", getTimestamp())
 	initVars()
 
@@ -202,8 +223,12 @@ func main() {
 	// Make the out file
 	out, err := os.Create(outFile)
 	checkError(err)
+	debugLog("Logfile created as", out.Name())
 	defer closeLog(out)
 
-	go readtoConn(in, connection)
-	readToFile(connection, out)
+	quit := make(chan bool)
+	debugLog("Spawning routine readTofile")
+	go readToFile(connection, out, quit)
+	debugLog("Spawning routine readtoConn")
+	go readtoConn(in, connection, quit)
 }
