@@ -75,7 +75,29 @@ func getWorkingDir(main string, sub string) string {
 	return w
 }
 
-func makeInFIFO(file string) {
+func setupConnection(s string) *net.TCPConn {
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", s)
+	checkError(err)
+	debugLog("server resolves to", tcpAddr)
+	connection, err := net.DialTCP("tcp", nil, tcpAddr)
+	checkError(err)
+	fmt.Println("~Connected at", getTimestamp())
+
+	// We keep alive for mucks
+	errSka := connection.SetKeepAlive(true)
+	checkError(errSka)
+	var keepalive time.Duration = 15 * time.Minute
+	errSkap := connection.SetKeepAlivePeriod(keepalive)
+	checkError(errSkap)
+	return connection
+}
+
+func closeConnection(c *net.TCPConn) {
+	fmt.Println("~Closing connection at", getTimestamp())
+	c.Close()
+}
+
+func makeFIFO(file string) *os.File {
 	if _, err := os.Stat(file); err == nil {
 		fmt.Println("FIFO already exists. Unlink or exit")
 		fmt.Println("if you run multiple connection with the same name you're gonna have a bad time")
@@ -92,20 +114,43 @@ func makeInFIFO(file string) {
 
 	err := syscall.Mkfifo(file, 0644)
 	checkError(err)
+	f, err := os.Open(file)
+	checkError(err)
+	return f
 }
 
-func closeAndRollLog(f *os.File) {
+func closeFIFO(f *os.File) {
+	n := f.Name()
+	f.Close()
+	syscall.Unlink(n)
+}
+
+func closeLog(f *os.File) {
 	f.Close()
 	err := os.Rename(outFile, getTimestamp())
 	checkError(err)
+}
+
+func readtoConn(f *os.File, c *net.TCPConn) {
+	for {
+		buf := make([]byte, 512)
+		bi, err := f.Read(buf)
+		checkError(err)
+		debugLog(bi, "bytes read from FIFO")
+		bo, err := c.Write(buf[:bi])
+		checkError(err)
+		debugLog(bo, "bytes written to file")
+	}
 }
 
 func readToFile(c *net.TCPConn, f *os.File) {
 	for {
 		buf := make([]byte, 512)
 		bi, err := c.Read(buf)
-		checkError(err)
-		debugLog(bi, "Bytes read from connection")
+		if err != nil {
+			continue
+		}
+		debugLog(bi, "bytes read from connection")
 
 		bo, err := f.Write(buf[:bi])
 		checkError(err)
@@ -125,31 +170,20 @@ func main() {
 	errCh := os.Chdir(workingDir)
 	checkError(errCh)
 
+	//create connection
+	server := fmt.Sprintf("%s:%d", connectionServer, connectionPort)
+	connection := setupConnection(server)
+	defer closeConnection(connection)
+
 	// Make the in FIFO
-	makeInFIFO(inFile)
-	defer syscall.Unlink(inFile)
+	in := makeFIFO(inFile)
+	defer closeFIFO(in)
 
-	//create connection with inFile to write and outFile to read
-	connStr := fmt.Sprintf("%s:%d", connectionServer, connectionPort)
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", connStr)
-	checkError(err)
-	debugLog("server resolves to", tcpAddr)
-	connection, err := net.DialTCP("tcp", nil, tcpAddr)
-	checkError(err)
-	fmt.Println("~Connected at", getTimestamp())
-	defer connection.Close()
-
-	// We keep alive for mucks
-	errSka := connection.SetKeepAlive(true)
-	checkError(errSka)
-	var keepalive time.Duration = 15 * time.Minute
-	errSkap := connection.SetKeepAlivePeriod(keepalive)
-	checkError(errSkap)
-
+	// Make the out file
 	out, err := os.Create(outFile)
 	checkError(err)
-	defer closeAndRollLog(out)
+	defer closeLog(out)
 
+	go readtoConn(in, connection)
 	readToFile(connection, out)
-
 }
