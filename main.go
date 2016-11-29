@@ -14,13 +14,15 @@ import (
 	"time"
 )
 
-// mostly hardcoded program settings
+// hardcoded program settings
 const baseDir string = "muck"
 const inFile string = "in"
 const outFile string = "out"
+const timeString string = "2006-01-02T150405"
 
-// Keep debug global
+// Program level switches set from command line
 var debugMode bool
+var disableLogRotate bool
 
 // MuckServer stores all connection settings
 type MuckServer struct {
@@ -52,11 +54,12 @@ func checkError(err error) {
 }
 
 func getTimestamp() string {
-	return time.Now().Format("2006-01-02T150405")
+	return time.Now().Format(timeString)
 }
 
 func initArgs() MuckServer {
 	flag.BoolVar(&debugMode, "debug", false, "Enable debug")
+	flag.BoolVar(&disableLogRotate, "nolog", false, "Disable log rotation on quit")
 	ssl := flag.Bool("ssl", false, "Enable ssl")
 	insecure := flag.Bool("insecure", false, "Disable strict SSL checking")
 	flag.Parse()
@@ -71,6 +74,7 @@ func initArgs() MuckServer {
 
 	s := MuckServer{name: args[0], host: args[1], port: uint(p), ssl: *ssl, insecure: *insecure}
 
+	debugLog("rotate log disabled?:", disableLogRotate)
 	debugLog("name:", s.name)
 	debugLog("host:", s.host)
 	debugLog("port:", s.port)
@@ -107,14 +111,23 @@ func makeFIFO(file string) *os.File {
 		checkError(errUn)
 		debugLog(file, "unlinked")
 	}
-
 	err := syscall.Mkfifo(file, 0644)
 	checkError(err)
 	debugLog("FIFO created as", file)
-	f, err := os.OpenFile(file, syscall.O_RDONLY|syscall.O_NONBLOCK, 0666)
+	f, err := os.OpenFile(file, os.O_RDONLY|syscall.O_NONBLOCK, 0666)
 	checkError(err)
 	debugLog("FIFO opened as", f.Name())
 	return f
+}
+
+func makeOut(file string) *os.File {
+	if _, err := os.Stat(file); err == nil {
+		fmt.Printf("Warning: %v already exists; appending.\n", file)
+	}
+	out, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	checkError(err)
+	debugLog("logfile created as", out.Name())
+	return out
 }
 
 func lookupHostname(s string) *net.TCPAddr {
@@ -183,7 +196,7 @@ func readToFile(c net.Conn, f *os.File, quit chan bool) {
 		bi, err := c.Read(buf)
 		if err != nil {
 			fmt.Println("Server disconnected with", err.Error())
-			_, err := f.WriteString(fmt.Sprintf("~Connection lost at %v\n", getTimestamp()))
+			_, err := f.WriteString(fmt.Sprintf("\n~Connection lost at %v\n", getTimestamp()))
 			checkError(err)
 			quit <- true
 			return
@@ -225,15 +238,16 @@ func closeLog(f *os.File) {
 	if errC != nil {
 		debugLog(errC.Error())
 	}
-	if _, err := os.Stat(n); err != nil {
-		fmt.Println(n, "file doesn't exist? Not rotating.")
+	debugLog(n, "closed")
+	if disableLogRotate == true {
+		debugLog("log rotation is disabled")
 		return
 	}
 	errR := os.Rename(outFile, getTimestamp())
 	if errR != nil {
 		debugLog(errR.Error())
 	}
-	debugLog(n, "closed and rotated")
+	debugLog(n, "rotated")
 }
 
 func main() {
@@ -260,9 +274,7 @@ func main() {
 	defer closeFIFO(in)
 
 	// Make the out file
-	out, err := os.Create(outFile)
-	checkError(err)
-	debugLog("logfile created as", out.Name())
+	out := makeOut(outFile)
 	defer closeLog(out)
 
 	//create connection

@@ -5,7 +5,6 @@ mm stands for Mu*Me
 mm is the muck/mush/mud/Mu* equivalent of [ii](http://tools.suckless.org/ii/), the FIFO and filesystem based irc client.
 
 This is a rewrite of the [python version](https://github.com/onlyhavecans/mmPython) in go.
-**IT is not yet complete**
 
 ## Usage
 When run it creates the ~/muck directory and a subdirectory based on the name of the connection specified on the command line
