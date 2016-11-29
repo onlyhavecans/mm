@@ -92,11 +92,6 @@ func setupConnection(s string) *net.TCPConn {
 	return connection
 }
 
-func closeConnection(c *net.TCPConn) {
-	fmt.Println("~Closing connection at", getTimestamp())
-	c.Close()
-}
-
 func makeFIFO(file string) *os.File {
 	if _, err := os.Stat(file); err == nil {
 		fmt.Println("FIFO already exists. Unlink or exit")
@@ -109,7 +104,8 @@ func makeFIFO(file string) *os.File {
 			fmt.Println("Canceling. Please remove FIFO before running")
 			os.Exit(1)
 		}
-		syscall.Unlink(file)
+		errUn := syscall.Unlink(file)
+		checkError(errUn)
 	}
 
 	err := syscall.Mkfifo(file, 0644)
@@ -118,19 +114,6 @@ func makeFIFO(file string) *os.File {
 	checkError(err)
 	return f
 }
-
-func closeFIFO(f *os.File) {
-	n := f.Name()
-	f.Close()
-	syscall.Unlink(n)
-}
-
-func closeLog(f *os.File) {
-	f.Close()
-	err := os.Rename(outFile, getTimestamp())
-	checkError(err)
-}
-
 func readtoConn(f *os.File, c *net.TCPConn) {
 	for {
 		buf := make([]byte, 512)
@@ -156,6 +139,43 @@ func readToFile(c *net.TCPConn, f *os.File) {
 		checkError(err)
 		debugLog(bo, "bytes written to file")
 	}
+}
+
+func closeConnection(c *net.TCPConn) {
+	fmt.Println("~Closing connection at", getTimestamp())
+	err := c.Close()
+	if err != nil {
+		debugLog(err.Error())
+	}
+	debugLog("Connection closed")
+}
+
+func closeFIFO(f *os.File) {
+	n := f.Name()
+	debugLog("closing and deleting FIFO", n)
+	errC := f.Close()
+	if errC != nil {
+		debugLog(errC.Error())
+	}
+	errU := syscall.Unlink(n)
+	if errU != nil {
+		debugLog(errU.Error())
+	}
+	debugLog(n, "closed and deleted")
+}
+
+func closeLog(f *os.File) {
+	n := f.Name()
+	debugLog("closing and rotating file", n)
+	errC := f.Close()
+	if errC != nil {
+		debugLog(errC.Error())
+	}
+	errR := os.Rename(outFile, getTimestamp())
+	if errR != nil {
+		debugLog(errR.Error())
+	}
+	debugLog(n, "closed and rotated")
 }
 
 func main() {
