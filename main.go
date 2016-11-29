@@ -128,8 +128,8 @@ func readtoConn(f *os.File, c *net.TCPConn, quit chan bool) {
 		default:
 			buf := make([]byte, 512)
 			bi, err := f.Read(buf)
-			if err != nil && err.Error() != "EOF" && err.Error() != "resource temporarily unavailable" {
-				checkError(err)
+			if err != nil && err.Error() != "EOF" {
+				debugLog("read from FIFO got", err.Error())
 			}
 			if bi == 0 {
 				continue
