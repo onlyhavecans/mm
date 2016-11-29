@@ -35,6 +35,7 @@ func debugLog(log ...interface{}) {
 
 func checkError(err error) {
 	if err != nil {
+		debugLog("checkError caught", err.Error())
 		s := fmt.Sprintln("fatal error", err.Error())
 		panic(s)
 	}
@@ -185,6 +186,10 @@ func closeLog(f *os.File) {
 	errC := f.Close()
 	if errC != nil {
 		debugLog(errC.Error())
+	}
+	if _, err := os.Stat(n); err != nil {
+		fmt.Println("out file doesn't exist? not rotating")
+		return
 	}
 	errR := os.Rename(outFile, getTimestamp())
 	if errR != nil {
