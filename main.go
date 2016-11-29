@@ -66,7 +66,7 @@ func initArgs() MuckServer {
 
 	args := flag.Args()
 	if len(args) != 3 {
-		fmt.Println("Usage: mm [--ssl] [--debug] <name> <server> <port>")
+		fmt.Println("Usage: mm [--debug] [--nolog] [--ssl] [--insecure] <name> <server> <port>")
 		os.Exit(1)
 	}
 	p, err := strconv.Atoi(args[2])
