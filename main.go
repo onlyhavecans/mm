@@ -58,20 +58,28 @@ func getTimestamp() string {
 }
 
 func initArgs() MuckServer {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "    %v [<flags>] <name> <server> <port>\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+
+	// Global program flags
 	flag.BoolVar(&debugMode, "debug", false, "Enable debug")
 	flag.BoolVar(&disableLogRotate, "nolog", false, "Disable log rotation on quit")
+	// Connection flags
 	ssl := flag.Bool("ssl", false, "Enable ssl")
 	insecure := flag.Bool("insecure", false, "Disable strict SSL checking")
 	flag.Parse()
 
-	args := flag.Args()
-	if len(args) != 3 {
-		fmt.Println("Usage: mm [--debug] [--nolog] [--ssl] [--insecure] <name> <server> <port>")
+	if flag.NArg() != 3 {
+		flag.Usage()
 		os.Exit(1)
 	}
+
+	args := flag.Args()
 	p, err := strconv.Atoi(args[2])
 	checkError(err)
-
 	s := MuckServer{name: args[0], host: args[1], port: uint(p), ssl: *ssl, insecure: *insecure}
 
 	debugLog("rotate log disabled?:", disableLogRotate)
