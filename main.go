@@ -162,7 +162,7 @@ func setupConnection(s *MuckServer) net.Conn {
 
 func setupTLSConnextion(s *MuckServer) net.Conn {
 	var conf *tls.Config
-	if s.insecure == true {
+	if s.insecure {
 		conf = &tls.Config{InsecureSkipVerify: true}
 	} else {
 		conf = &tls.Config{ServerName: s.host}
@@ -247,7 +247,7 @@ func closeLog(f *os.File) {
 		debugLog(errC.Error())
 	}
 	debugLog(n, "closed")
-	if disableLogRotate == true {
+	if disableLogRotate {
 		debugLog("log rotation is disabled")
 		return
 	}
@@ -287,7 +287,7 @@ func main() {
 
 	//create connection
 	var connection net.Conn
-	if server.ssl == true {
+	if server.ssl {
 		connection = setupTLSConnextion(&server)
 	} else {
 		connection = setupConnection(&server)
