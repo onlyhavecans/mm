@@ -87,7 +87,7 @@ func setupConnection(s string) *net.TCPConn {
 	// We keep alive for mucks
 	errSka := connection.SetKeepAlive(true)
 	checkError(errSka)
-	var keepalive time.Duration = 15 * time.Minute
+	keepalive := 15 * time.Minute
 	errSkap := connection.SetKeepAlivePeriod(keepalive)
 	checkError(errSkap)
 	return connection
@@ -103,7 +103,7 @@ func makeFIFO(file string) *os.File {
 		checkError(err)
 		if a != "YES\n" {
 			fmt.Println("Canceling. Please remove FIFO before running")
-			os.Exit(1)
+			panic("User Canceled at FIFO removal prompt")
 		}
 		errUn := syscall.Unlink(file)
 		checkError(errUn)
@@ -131,8 +131,7 @@ func readtoConn(f *os.File, c *net.TCPConn, quit chan bool) {
 			bi, err := f.Read(buf)
 			if err != nil && err.Error() != "EOF" && err.Error() != tmpError {
 				checkError(err)
-			}
-			if bi == 0 {
+			} else if bi == 0 {
 				continue
 			}
 			debugLog(bi, "bytes read from FIFO")
