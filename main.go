@@ -27,7 +27,7 @@ var (
 	debugMode        bool
 )
 
-func debugLog(log ...string) {
+func debugLog(log ...interface{}) {
 	if debugMode {
 		fmt.Println(log)
 	}
@@ -35,8 +35,8 @@ func debugLog(log ...string) {
 
 func checkError(err error) {
 	if err != nil {
-		fmt.Println("Fatal error ", err.Error())
-		os.Exit(1)
+		fmt.Println("fatal error", err.Error())
+		os.Exit(3162)
 	}
 }
 
@@ -62,8 +62,8 @@ func initVars() {
 
 	debugLog("Name:", connectionName)
 	debugLog("Server:", connectionServer)
-	debugLog("Port:", strconv.Itoa(int(connectionPort)))
-	debugLog("SSL?:", strconv.FormatBool(useSSL))
+	debugLog("Port:", connectionPort)
+	debugLog("SSL?:", useSSL)
 }
 
 func getWorkingDir(main string, sub string) string {
@@ -83,7 +83,7 @@ func makeInFIFO(file string) {
 		i := bufio.NewReader(os.Stdin)
 		a, err := i.ReadString('\n')
 		checkError(err)
-		if a != "YES" {
+		if a != "YES\n" {
 			fmt.Println("Canceling. Please remove FIFO before running")
 			os.Exit(1)
 		}
@@ -94,8 +94,23 @@ func makeInFIFO(file string) {
 	checkError(err)
 }
 
-func readToOutfile(conn net.TCPConn, file os.File) {
+func closeAndRollLog(f *os.File) {
+	f.Close()
+	err := os.Rename(outFile, getTimestamp())
+	checkError(err)
+}
 
+func readToFile(c *net.TCPConn, f *os.File) {
+	for {
+		buf := make([]byte, 512)
+		bi, err := c.Read(buf)
+		checkError(err)
+		debugLog(bi, "Bytes read from connection")
+
+		bo, err := f.Write(buf[:bi])
+		checkError(err)
+		debugLog(bo, "bytes written to file")
+	}
 }
 
 func main() {
@@ -118,6 +133,7 @@ func main() {
 	connStr := fmt.Sprintf("%s:%d", connectionServer, connectionPort)
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", connStr)
 	checkError(err)
+	debugLog("server resolves to", tcpAddr)
 	connection, err := net.DialTCP("tcp", nil, tcpAddr)
 	checkError(err)
 	fmt.Println("~Connected at", getTimestamp())
@@ -132,10 +148,8 @@ func main() {
 
 	out, err := os.Create(outFile)
 	checkError(err)
-	defer out.Close()
+	defer closeAndRollLog(out)
 
-	go readToOutfile(connection, out)
-
-	//defer rolling out
+	readToFile(connection, out)
 
 }
