@@ -119,7 +119,7 @@ func makeFIFO(file string) *os.File {
 	return f
 }
 
-func readtoConn(f *os.File, c *net.TCPConn, quit chan bool) {
+func readtoConn(f *os.File, c net.Conn, quit chan bool) {
 	tmpError := fmt.Sprintf("read %v: resource temporarily unavailable", f.Name())
 	for {
 		select {
@@ -142,7 +142,7 @@ func readtoConn(f *os.File, c *net.TCPConn, quit chan bool) {
 	}
 }
 
-func readToFile(c *net.TCPConn, f *os.File, quit chan bool) {
+func readToFile(c net.Conn, f *os.File, quit chan bool) {
 	for {
 		buf := make([]byte, 512)
 		bi, err := c.Read(buf)
@@ -159,7 +159,7 @@ func readToFile(c *net.TCPConn, f *os.File, quit chan bool) {
 	}
 }
 
-func closeConnection(c *net.TCPConn) {
+func closeConnection(c net.Conn) {
 	fmt.Println("~Closing connection at", getTimestamp())
 	err := c.Close()
 	if err != nil {
