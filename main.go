@@ -13,21 +13,32 @@ import (
 	"time"
 )
 
+// mostly hardcoded program settings
 const baseDir string = "muck"
 const inFile string = "in"
 const outFile string = "out"
 
-var (
-	connectionName   string
-	connectionServer string
-	connectionPort   uint
-	useSSL           bool
-	debugMode        bool
-)
+// Keep debug global
+var debugMode bool
+
+// Simple struct for our connection
+type MuckServer struct {
+	name string
+	host string
+	port uint
+	ssl  bool
+}
+
+// Simplify returning connection strings by making it the String method
+func (m *MuckServer) String() string {
+	s := fmt.Sprintf("%s:%d", m.host, m.port)
+	return s
+}
 
 func debugLog(log ...interface{}) {
 	if debugMode {
-		fmt.Println(log)
+		fmt.Print("DEBUG: ")
+		fmt.Println(log...)
 	}
 }
 
@@ -43,9 +54,9 @@ func getTimestamp() string {
 	return time.Now().Format("2006-01-02T150405")
 }
 
-func initVars() {
-	flag.BoolVar(&useSSL, "ssl", false, "Enable ssl")
+func initArgs() MuckServer {
 	flag.BoolVar(&debugMode, "debug", false, "Enable debug")
+	ssl := flag.Bool("ssl", false, "Enable ssl")
 	flag.Parse()
 
 	args := flag.Args()
@@ -53,16 +64,17 @@ func initVars() {
 		fmt.Println("Usage: mm [--ssl] [--debug] <name> <server> <port>")
 		os.Exit(1)
 	}
-	connectionName = args[0]
-	connectionServer = args[1]
 	p, err := strconv.Atoi(args[2])
 	checkError(err)
-	connectionPort = uint(p)
 
-	debugLog("Name:", connectionName)
-	debugLog("Server:", connectionServer)
-	debugLog("Port:", connectionPort)
-	debugLog("SSL?:", useSSL)
+	s := MuckServer{name: args[0], host: args[1], port: uint(p), ssl: *ssl}
+
+	debugLog("name:", s.name)
+	debugLog("host:", s.host)
+	debugLog("port:", s.port)
+	debugLog("SSL?:", s.ssl)
+
+	return s
 }
 
 func getWorkingDir(main string, sub string) string {
@@ -76,8 +88,8 @@ func getWorkingDir(main string, sub string) string {
 	return w
 }
 
-func setupConnection(s string) net.Conn {
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", s)
+func setupConnection(s *MuckServer) net.Conn {
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", s.String())
 	checkError(err)
 	debugLog("server resolves to", tcpAddr)
 	connection, err := net.DialTCP("tcp", nil, tcpAddr)
@@ -91,6 +103,12 @@ func setupConnection(s string) net.Conn {
 	errSkap := connection.SetKeepAlivePeriod(keepalive)
 	checkError(errSkap)
 	return connection
+}
+
+func setupTLSConnextion(s *MuckServer) net.Conn {
+	var connection net.Conn
+	return connection
+
 }
 
 func makeFIFO(file string) *os.File {
@@ -201,17 +219,18 @@ func closeLog(f *os.File) {
 }
 
 func main() {
+	// checkError throws a panic, catch it at the end and return error to user
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Recovered", r)
+			fmt.Println("FATAL ERROR", r)
 		}
 	}()
 
 	fmt.Println("~Started at", getTimestamp())
-	initVars()
+	server := initArgs()
 
 	// Make and move to working directory
-	workingDir := getWorkingDir(baseDir, connectionName)
+	workingDir := getWorkingDir(baseDir, server.name)
 	errMk := os.MkdirAll(workingDir, 0755)
 	checkError(errMk)
 
@@ -219,8 +238,12 @@ func main() {
 	checkError(errCh)
 
 	//create connection
-	server := fmt.Sprintf("%s:%d", connectionServer, connectionPort)
-	connection := setupConnection(server)
+	var connection net.Conn
+	if server.ssl == true {
+		connection = setupTLSConnextion(&server)
+	} else {
+		connection = setupConnection(&server)
+	}
 	defer closeConnection(connection)
 
 	// Make the in FIFO
