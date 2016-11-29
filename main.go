@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/user"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
-
-	"path/filepath"
-
-	"github.com/mitchellh/go-homedir"
 )
 
 const baseDir string = "muck"
@@ -68,11 +66,13 @@ func initVars() {
 }
 
 func getWorkingDir(main string, sub string) string {
-	h, err := homedir.Dir()
+	u, err := user.Current()
 	checkError(err)
+	h := u.HomeDir
 	debugLog("Home directory", h)
 
 	w := filepath.Join(h, main, sub)
+	debugLog("working directory", w)
 	return w
 }
 
@@ -120,6 +120,7 @@ func makeFIFO(file string) *os.File {
 }
 
 func readtoConn(f *os.File, c *net.TCPConn, quit chan bool) {
+	tmpError := fmt.Sprintf("read %v: resource temporarily unavailable", f.Name())
 	for {
 		select {
 		case <-quit:
@@ -128,8 +129,8 @@ func readtoConn(f *os.File, c *net.TCPConn, quit chan bool) {
 		default:
 			buf := make([]byte, 512)
 			bi, err := f.Read(buf)
-			if err != nil && err.Error() != "EOF" {
-				debugLog("read from FIFO got", err.Error())
+			if err != nil && err.Error() != "EOF" && err.Error() != tmpError {
+				checkError(err)
 			}
 			if bi == 0 {
 				continue
