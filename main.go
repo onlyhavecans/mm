@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"net"
@@ -23,10 +24,11 @@ var debugMode bool
 
 // MuckServer stores all connection settings
 type MuckServer struct {
-	name string
-	host string
-	port uint
-	ssl  bool
+	name     string
+	host     string
+	port     uint
+	ssl      bool
+	insecure bool
 }
 
 // Simplify returning connection strings by making it the String method
@@ -56,6 +58,7 @@ func getTimestamp() string {
 func initArgs() MuckServer {
 	flag.BoolVar(&debugMode, "debug", false, "Enable debug")
 	ssl := flag.Bool("ssl", false, "Enable ssl")
+	insecure := flag.Bool("insecure", false, "Disable strict SSL checking")
 	flag.Parse()
 
 	args := flag.Args()
@@ -66,12 +69,13 @@ func initArgs() MuckServer {
 	p, err := strconv.Atoi(args[2])
 	checkError(err)
 
-	s := MuckServer{name: args[0], host: args[1], port: uint(p), ssl: *ssl}
+	s := MuckServer{name: args[0], host: args[1], port: uint(p), ssl: *ssl, insecure: *insecure}
 
 	debugLog("name:", s.name)
 	debugLog("host:", s.host)
 	debugLog("port:", s.port)
 	debugLog("SSL?:", s.ssl)
+	debugLog("insecure ssl check?:", s.insecure)
 
 	return s
 }
@@ -113,10 +117,15 @@ func makeFIFO(file string) *os.File {
 	return f
 }
 
-func setupConnection(s *MuckServer) net.Conn {
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", s.String())
+func lookupHostname(s string) *net.TCPAddr {
+	a, err := net.ResolveTCPAddr("tcp", s)
 	checkError(err)
-	debugLog("server resolves to", tcpAddr)
+	debugLog("server resolves to", a)
+	return a
+}
+
+func setupConnection(s *MuckServer) net.Conn {
+	tcpAddr := lookupHostname(s.String())
 	connection, err := net.DialTCP("tcp", nil, tcpAddr)
 	checkError(err)
 	debugLog("connected to Server")
@@ -131,9 +140,16 @@ func setupConnection(s *MuckServer) net.Conn {
 }
 
 func setupTLSConnextion(s *MuckServer) net.Conn {
-	var connection net.Conn
+	var conf *tls.Config
+	if s.insecure == true {
+		conf = &tls.Config{InsecureSkipVerify: true}
+	} else {
+		conf = &tls.Config{ServerName: s.host}
+	}
+	tcpAddr := lookupHostname(s.String())
+	connection, err := tls.Dial("tcp", tcpAddr.String(), conf)
+	checkError(err)
 	return connection
-
 }
 
 func readtoConn(f *os.File, c net.Conn, quit chan bool) {
