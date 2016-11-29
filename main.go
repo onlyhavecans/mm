@@ -113,7 +113,7 @@ func makeFIFO(file string) *os.File {
 	err := syscall.Mkfifo(file, 0644)
 	checkError(err)
 	debugLog("FIFO created as", file)
-	f, err := os.Open(file)
+	f, err := os.OpenFile(file, syscall.O_RDONLY|syscall.O_NONBLOCK, 0666)
 	checkError(err)
 	debugLog("FIFO opened as", f.Name())
 	return f
@@ -123,12 +123,13 @@ func readtoConn(f *os.File, c *net.TCPConn, quit chan bool) {
 	for {
 		select {
 		case <-quit:
+			debugLog("readtoConn got quit, returning")
 			return
 		default:
 			buf := make([]byte, 512)
 			bi, err := f.Read(buf)
 			if err != nil && err.Error() != "EOF" {
-				checkError(err)
+				debugLog("read from FIFO got", err.Error())
 			}
 			if bi == 0 {
 				continue
@@ -148,6 +149,7 @@ func readToFile(c *net.TCPConn, f *os.File, quit chan bool) {
 		if err != nil {
 			fmt.Println("Connection broken,", err.Error())
 			quit <- true
+			return
 		}
 		debugLog(bi, "bytes read from connection")
 
@@ -232,8 +234,8 @@ func main() {
 	defer closeLog(out)
 
 	quit := make(chan bool)
-	debugLog("Spawning routine readTofile")
 	go readToFile(connection, out, quit)
-	debugLog("Spawning routine readtoConn")
-	go readtoConn(in, connection, quit)
+	readtoConn(in, connection, quit)
+
+	debugLog("End of main hit")
 }
