@@ -45,8 +45,7 @@ func debugLog(log ...interface{}) {
 func checkError(err error) {
 	if err != nil {
 		debugLog("checkError caught", err.Error())
-		s := fmt.Sprintln("fatal error", err.Error())
-		panic(s)
+		panic(err.Error())
 	}
 }
 
@@ -81,40 +80,17 @@ func getWorkingDir(main string, sub string) string {
 	u, err := user.Current()
 	checkError(err)
 	h := u.HomeDir
-	debugLog("Home directory", h)
+	debugLog("home directory", h)
 
 	w := filepath.Join(h, main, sub)
 	debugLog("working directory", w)
 	return w
 }
 
-func setupConnection(s *MuckServer) net.Conn {
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", s.String())
-	checkError(err)
-	debugLog("server resolves to", tcpAddr)
-	connection, err := net.DialTCP("tcp", nil, tcpAddr)
-	checkError(err)
-	fmt.Println("~Connected at", getTimestamp())
-
-	// We keep alive for mucks
-	errSka := connection.SetKeepAlive(true)
-	checkError(errSka)
-	keepalive := 15 * time.Minute
-	errSkap := connection.SetKeepAlivePeriod(keepalive)
-	checkError(errSkap)
-	return connection
-}
-
-func setupTLSConnextion(s *MuckServer) net.Conn {
-	var connection net.Conn
-	return connection
-
-}
-
 func makeFIFO(file string) *os.File {
 	if _, err := os.Stat(file); err == nil {
 		fmt.Println("FIFO already exists. Unlink or exit")
-		fmt.Println("if you run multiple connection with the same name you're gonna have a bad time")
+		fmt.Println("If you run multiple connection with the same name you're gonna have a bad time")
 		fmt.Print("Type YES to unlink and recreate: ")
 		i := bufio.NewReader(os.Stdin)
 		a, err := i.ReadString('\n')
@@ -137,12 +113,35 @@ func makeFIFO(file string) *os.File {
 	return f
 }
 
+func setupConnection(s *MuckServer) net.Conn {
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", s.String())
+	checkError(err)
+	debugLog("server resolves to", tcpAddr)
+	connection, err := net.DialTCP("tcp", nil, tcpAddr)
+	checkError(err)
+	debugLog("connected to Server")
+
+	// We keep alive for mucks
+	errSka := connection.SetKeepAlive(true)
+	checkError(errSka)
+	keepalive := 15 * time.Minute
+	errSkap := connection.SetKeepAlivePeriod(keepalive)
+	checkError(errSkap)
+	return connection
+}
+
+func setupTLSConnextion(s *MuckServer) net.Conn {
+	var connection net.Conn
+	return connection
+
+}
+
 func readtoConn(f *os.File, c net.Conn, quit chan bool) {
 	tmpError := fmt.Sprintf("read %v: resource temporarily unavailable", f.Name())
 	for {
 		select {
 		case <-quit:
-			debugLog("readtoConn got quit, returning")
+			debugLog("readtoConn recieved quit; returning")
 			return
 		default:
 			buf := make([]byte, 512)
@@ -161,11 +160,13 @@ func readtoConn(f *os.File, c net.Conn, quit chan bool) {
 }
 
 func readToFile(c net.Conn, f *os.File, quit chan bool) {
+	f.WriteString(fmt.Sprintf("~Connected at %v\n", getTimestamp()))
 	for {
 		buf := make([]byte, 512)
 		bi, err := c.Read(buf)
 		if err != nil {
-			fmt.Println("Connection broken,", err.Error())
+			fmt.Println("Server disconnected with", err.Error())
+			f.WriteString(fmt.Sprintf("~Connection lost at %v\n", getTimestamp()))
 			quit <- true
 			return
 		}
@@ -178,12 +179,11 @@ func readToFile(c net.Conn, f *os.File, quit chan bool) {
 }
 
 func closeConnection(c net.Conn) {
-	fmt.Println("~Closing connection at", getTimestamp())
 	err := c.Close()
 	if err != nil {
 		debugLog(err.Error())
 	}
-	debugLog("Connection closed")
+	debugLog("connection closed")
 }
 
 func closeFIFO(f *os.File) {
@@ -208,7 +208,7 @@ func closeLog(f *os.File) {
 		debugLog(errC.Error())
 	}
 	if _, err := os.Stat(n); err != nil {
-		fmt.Println("out file doesn't exist? not rotating")
+		fmt.Println(n, "file doesn't exist? Not rotating.")
 		return
 	}
 	errR := os.Rename(outFile, getTimestamp())
@@ -226,7 +226,7 @@ func main() {
 		}
 	}()
 
-	fmt.Println("~Started at", getTimestamp())
+	fmt.Println("Started at", getTimestamp())
 	server := initArgs()
 
 	// Make and move to working directory
@@ -237,6 +237,16 @@ func main() {
 	errCh := os.Chdir(workingDir)
 	checkError(errCh)
 
+	// Make the in FIFO
+	in := makeFIFO(inFile)
+	defer closeFIFO(in)
+
+	// Make the out file
+	out, err := os.Create(outFile)
+	checkError(err)
+	debugLog("logfile created as", out.Name())
+	defer closeLog(out)
+
 	//create connection
 	var connection net.Conn
 	if server.ssl == true {
@@ -246,19 +256,11 @@ func main() {
 	}
 	defer closeConnection(connection)
 
-	// Make the in FIFO
-	in := makeFIFO(inFile)
-	defer closeFIFO(in)
-
-	// Make the out file
-	out, err := os.Create(outFile)
-	checkError(err)
-	debugLog("Logfile created as", out.Name())
-	defer closeLog(out)
-
 	quit := make(chan bool)
 	go readToFile(connection, out, quit)
 	readtoConn(in, connection, quit)
 
-	debugLog("End of main hit")
+	fmt.Println("Quit at", getTimestamp())
+	fmt.Println("Thanks for playing!")
+	debugLog("end of main hit")
 }
