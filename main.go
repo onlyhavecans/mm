@@ -21,7 +21,7 @@ const outFile string = "out"
 // Keep debug global
 var debugMode bool
 
-// Simple struct for our connection
+// MuckServer stores all connection settings
 type MuckServer struct {
 	name string
 	host string
@@ -160,13 +160,15 @@ func readtoConn(f *os.File, c net.Conn, quit chan bool) {
 }
 
 func readToFile(c net.Conn, f *os.File, quit chan bool) {
-	f.WriteString(fmt.Sprintf("~Connected at %v\n", getTimestamp()))
+	_, err := f.WriteString(fmt.Sprintf("~Connected at %v\n", getTimestamp()))
+	checkError(err)
 	for {
 		buf := make([]byte, 512)
 		bi, err := c.Read(buf)
 		if err != nil {
 			fmt.Println("Server disconnected with", err.Error())
-			f.WriteString(fmt.Sprintf("~Connection lost at %v\n", getTimestamp()))
+			_, err := f.WriteString(fmt.Sprintf("~Connection lost at %v\n", getTimestamp()))
+			checkError(err)
 			quit <- true
 			return
 		}
