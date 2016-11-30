@@ -2,17 +2,18 @@
 
 mm stands for Mu*Me
 
-mm is the muck/mush/mud/Mu* equivalent of [ii](http://tools.suckless.org/ii/), the FIFO and filesystem based irc client.
+mm is the muck/mush/mud/Mu* equivalent of [ii](http://tools.suckless.org/ii/); the minimalist FIFO and filesystem-based IRC client.
 
 This is a rewrite of the [python version](https://github.com/onlyhavecans/mmPython) in go.
 
 ## Install
 
 ### Easy
-* Install golang/go
-* `go install github.com/onlyhavecans/mm/...`
+* Install Golang for your OS (brew install go for OS X)
+* Set your $GOPATH enviroment
+* `go get github.com/onlyhavecans/mm/...`
 
-### Easier
+### Easiest
 * Download binary for your OS from [Releases](https://github.com/onlyhavecans/mm/releases)
 * (Optional) rename from `mm_<os>` to `mm`
 * Place somewhere in your path
