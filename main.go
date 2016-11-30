@@ -19,6 +19,7 @@ const baseDir string = "muck"
 const inFile string = "in"
 const outFile string = "out"
 const timeString string = "2006-01-02T150405"
+const bufferSize int = 1024
 
 // Program level switches set from command line
 var debugMode bool
@@ -173,19 +174,23 @@ func setupTLSConnextion(s *MuckServer) net.Conn {
 	return connection
 }
 
-func readtoConn(f *os.File, c net.Conn, quit chan bool) {
-	tmpError := fmt.Sprintf("read %v: resource temporarily unavailable", f.Name())
+func readToConn(f *os.File, c net.Conn, quit chan bool) {
 	for {
 		select {
 		case <-quit:
 			debugLog("readtoConn recieved quit; returning")
 			return
 		default:
-			buf := make([]byte, 512)
+			// This pause between reads from the FIFO. This is the difference between
+			// 0% and 100% cpu usage. Also without this you will get "read %v:
+			// resource temporarily unavailable" errors
+			time.Sleep(time.Second / 10)
+			buf := make([]byte, bufferSize)
 			bi, err := f.Read(buf)
-			if err != nil && err.Error() != "EOF" && err.Error() != tmpError {
+			if err != nil && err.Error() != "EOF" {
 				checkError(err)
 			} else if bi == 0 {
+				time.Sleep(time.Second)
 				continue
 			}
 			debugLog(bi, "bytes read from FIFO")
@@ -200,7 +205,7 @@ func readToFile(c net.Conn, f *os.File, quit chan bool) {
 	_, err := f.WriteString(fmt.Sprintf("~Connected at %v\n", getTimestamp()))
 	checkError(err)
 	for {
-		buf := make([]byte, 512)
+		buf := make([]byte, bufferSize)
 		bi, err := c.Read(buf)
 		if err != nil {
 			fmt.Println("Server disconnected with", err.Error())
@@ -296,7 +301,7 @@ func main() {
 
 	quit := make(chan bool)
 	go readToFile(connection, out, quit)
-	readtoConn(in, connection, quit)
+	readToConn(in, connection, quit)
 
 	fmt.Println("Quit at", getTimestamp())
 	fmt.Println("Thanks for playing!")
