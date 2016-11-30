@@ -182,16 +182,15 @@ func readToConn(f *os.File, c net.Conn, quit chan bool) {
 			debugLog("readtoConn recieved quit; returning")
 			return
 		default:
-			// This pause between reads from the FIFO. This is the difference between
-			// 0.1% and 100% cpu usage. Also without this you will get excessive "read
-			// %v: resource temporarily unavailable" errors.
-			time.Sleep(time.Millisecond)
+			// This pause between reads from the FIFO is the difference between 0.2%
+			// and 100% cpu usage when idle. Also without this you will get excessive
+			// "read %v: resource temporarily unavailable" errors on some OSes.
+			time.Sleep(100 * time.Millisecond)
 			buf := make([]byte, bufferSize)
 			bi, err := f.Read(buf)
 			if err != nil && err.Error() != "EOF" && err.Error() != tmpError {
 				checkError(err)
 			} else if bi == 0 {
-				time.Sleep(time.Second)
 				continue
 			}
 			debugLog(bi, "bytes read from FIFO")
