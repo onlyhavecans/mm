@@ -6,6 +6,17 @@ mm is the muck/mush/mud/Mu* equivalent of [ii](http://tools.suckless.org/ii/), t
 
 This is a rewrite of the [python version](https://github.com/onlyhavecans/mmPython) in go.
 
+## Install
+
+### Easy
+* Install golang/go
+* `go install github.com/onlyhavecans/mm/...`
+
+### Easier
+* Download binary for your OS from [Releases](https://github.com/onlyhavecans/mm/releases)
+* (Optional) rename from `mm_<os>` to `mm`
+* Place somewhere in your path
+
 ## Usage
 
 `mm [--debug] [--nolog] [--ssl] [--insecure] <name> <server> <port>`
