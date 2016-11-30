@@ -185,7 +185,7 @@ func readToConn(f *os.File, c net.Conn, quit chan bool) {
 			// This pause between reads from the FIFO. This is the difference between
 			// 0.1% and 100% cpu usage. Also without this you will get excessive "read
 			// %v: resource temporarily unavailable" errors.
-			time.Sleep(time.Second / 10)
+			time.Sleep(time.Millisecond)
 			buf := make([]byte, bufferSize)
 			bi, err := f.Read(buf)
 			if err != nil && err.Error() != "EOF" && err.Error() != tmpError {
