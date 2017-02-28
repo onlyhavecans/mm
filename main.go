@@ -21,6 +21,7 @@ const inFile string = "in"
 const outFile string = "out"
 const timeString string = "2006-01-02T150405"
 const bufferSize int = 1024
+const fifoReadDelay time.Duration = 100 * time.Millisecond
 
 // Program level switches set from command line
 var debugMode bool
@@ -186,7 +187,7 @@ func readToConn(f *os.File, c net.Conn, quit chan bool) {
 			// This pause between reads from the FIFO is the difference between 0.2%
 			// and 100% cpu usage when idle. Also without this you will get excessive
 			// "read %v: resource temporarily unavailable" errors on some OSes.
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(fifoReadDelay)
 			buf := make([]byte, bufferSize)
 			bi, err := f.Read(buf)
 			if err != nil && err.Error() != "EOF" && err.Error() != tmpError {
