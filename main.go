@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	"net/textproto"
 )
 
 // hardcoded program settings
@@ -205,8 +206,9 @@ func readToFile(c net.Conn, f *os.File, quit chan bool) {
 	_, err := f.WriteString(fmt.Sprintf("~Connected at %v\n", getTimestamp()))
 	checkError(err)
 	for {
-		buf := make([]byte, bufferSize)
-		bi, err := c.Read(buf)
+		r := bufio.NewReader(c)
+		tp := textproto.NewReader(r)
+		line, err := tp.ReadLine()
 		if err != nil {
 			fmt.Println("Server disconnected with", err.Error())
 			_, err := f.WriteString(fmt.Sprintf("\n~Connection lost at %v\n", getTimestamp()))
@@ -214,9 +216,9 @@ func readToFile(c net.Conn, f *os.File, quit chan bool) {
 			quit <- true
 			return
 		}
-		debugLog(bi, "bytes read from connection")
+		debugLog(len(line), "characters read from connection")
 
-		bo, err := f.Write(buf[:bi])
+		bo, err := fmt.Fprintln(f, line)
 		checkError(err)
 		debugLog(bo, "bytes written to file")
 	}
