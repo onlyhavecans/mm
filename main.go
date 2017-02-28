@@ -6,13 +6,13 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/textproto"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
-	"net/textproto"
 )
 
 // hardcoded program settings
@@ -22,13 +22,14 @@ const outFile string = "out"
 const timeString string = "2006-01-02T150405"
 const bufferSize int = 1024
 const fifoReadDelay time.Duration = 100 * time.Millisecond
+const keepalive time.Duration = 15 * time.Minute
 
 // Program level switches set from command line
 var debugMode bool
 var disableLogRotate bool
 
-// MuckServer stores all connection settings
-type MuckServer struct {
+// config stores all tunable settings
+type config struct {
 	name     string
 	host     string
 	port     uint
@@ -37,7 +38,7 @@ type MuckServer struct {
 }
 
 // Simplify returning connection strings by making it the String method
-func (m *MuckServer) String() string {
+func (m *config) String() string {
 	s := fmt.Sprintf("%s:%d", m.host, m.port)
 	return s
 }
@@ -60,7 +61,7 @@ func getTimestamp() string {
 	return time.Now().Format(timeString)
 }
 
-func initArgs() MuckServer {
+func initArgs() config {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "    %v [<flags>] <name> <server> <port>\n", os.Args[0])
@@ -83,7 +84,7 @@ func initArgs() MuckServer {
 	args := flag.Args()
 	p, err := strconv.Atoi(args[2])
 	checkError(err)
-	s := MuckServer{name: args[0], host: args[1], port: uint(p), ssl: *ssl, insecure: *insecure}
+	s := config{name: args[0], host: args[1], port: uint(p), ssl: *ssl, insecure: *insecure}
 
 	debugLog("rotate log disabled?:", disableLogRotate)
 	debugLog("name:", s.name)
@@ -125,7 +126,7 @@ func makeFIFO(file string) *os.File {
 	err := syscall.Mkfifo(file, 0644)
 	checkError(err)
 	debugLog("FIFO created as", file)
-	f, err := os.OpenFile(file, os.O_RDONLY|syscall.O_NONBLOCK, 0666)
+	f, err := os.OpenFile(file, os.O_RDONLY|syscall.O_NONBLOCK, os.ModeNamedPipe)
 	checkError(err)
 	debugLog("FIFO opened as", f.Name())
 	return f
@@ -148,7 +149,7 @@ func lookupHostname(s string) *net.TCPAddr {
 	return a
 }
 
-func setupConnection(s *MuckServer) net.Conn {
+func setupConnection(s *config) net.Conn {
 	tcpAddr := lookupHostname(s.String())
 	connection, err := net.DialTCP("tcp", nil, tcpAddr)
 	checkError(err)
@@ -157,13 +158,12 @@ func setupConnection(s *MuckServer) net.Conn {
 	// We keep alive for mucks
 	errSka := connection.SetKeepAlive(true)
 	checkError(errSka)
-	keepalive := 15 * time.Minute
 	errSkap := connection.SetKeepAlivePeriod(keepalive)
 	checkError(errSkap)
 	return connection
 }
 
-func setupTLSConnextion(s *MuckServer) net.Conn {
+func setupTLSConnextion(s *config) net.Conn {
 	var conf *tls.Config
 	if s.insecure {
 		conf = &tls.Config{InsecureSkipVerify: true}
