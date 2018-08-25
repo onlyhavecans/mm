@@ -2,7 +2,7 @@ package main
 
 import "testing"
 
-var argsTests []struct{
+var argsTests []struct {
 	args     []string
 	expected config
 }

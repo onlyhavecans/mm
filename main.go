@@ -21,8 +21,8 @@ const inFile string = "in"
 const outFile string = "out"
 const timeString string = "2006-01-02T150405"
 const bufferSize int = 1024
-const fifoReadDelay time.Duration = 100 * time.Millisecond
-const keepalive time.Duration = 15 * time.Minute
+const fifoReadDelay = 100 * time.Millisecond
+const keepalive = 15 * time.Minute
 
 // Program level switches set from command line
 var debugMode bool
