@@ -181,7 +181,7 @@ func readToConn(f *os.File, c net.Conn, quit chan bool) {
 	for {
 		select {
 		case <-quit:
-			debugLog("readtoConn recieved quit; returning")
+			debugLog("readtoConn received quit; returning")
 			return
 		default:
 			// This pause between reads from the FIFO is the difference between 0.2%
