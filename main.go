@@ -16,17 +16,21 @@ import (
 )
 
 // hardcoded program settings
-const baseDir string = "muck"
-const inFile string = "in"
-const outFile string = "out"
-const timeString string = "2006-01-02T150405"
-const bufferSize int = 1024
-const fifoReadDelay = 100 * time.Millisecond
-const keepalive = 15 * time.Minute
+const (
+	baseDir       string = "muck"
+	inFile        string = "in"
+	outFile       string = "out"
+	timeString    string = "2006-01-02T150405"
+	bufferSize    int    = 1024
+	fifoReadDelay        = 100 * time.Millisecond
+	keepalive            = 15 * time.Minute
+)
 
 // Program level switches set from command line
-var debugMode bool
-var disableLogRotate bool
+var (
+	debugMode        bool
+	disableLogRotate bool
+)
 
 // config stores all tunable settings
 type config struct {
@@ -204,7 +208,7 @@ func readToConn(f *os.File, c net.Conn, quit chan bool) {
 }
 
 func readToFile(c net.Conn, f *os.File, quit chan bool) {
-	_, err := f.WriteString(fmt.Sprintf("~Connected at %v\n", getTimestamp()))
+	_, err := fmt.Fprintf(f, "~Connected at %v\n", getTimestamp())
 	checkError(err)
 	for {
 		r := bufio.NewReader(c)
@@ -212,7 +216,7 @@ func readToFile(c net.Conn, f *os.File, quit chan bool) {
 		line, err := tp.ReadLine()
 		if err != nil {
 			fmt.Println("Server disconnected with", err.Error())
-			_, err := f.WriteString(fmt.Sprintf("\n~Connection lost at %v\n", getTimestamp()))
+			_, err := fmt.Fprintf(f, "\n~Connection lost at %v\n", getTimestamp())
 			checkError(err)
 			quit <- true
 			return
@@ -293,7 +297,7 @@ func main() {
 	out := makeOut(outFile)
 	defer closeLog(out)
 
-	//create connection
+	// create connection
 	var connection net.Conn
 	if server.ssl {
 		connection = setupTLSConnextion(&server)
