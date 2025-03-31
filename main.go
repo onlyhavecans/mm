@@ -47,7 +47,7 @@ func (m *config) String() string {
 	return s
 }
 
-func debugLog(log ...interface{}) {
+func debugLog(log ...any) {
 	if debugMode {
 		fmt.Print("DEBUG: ")
 		fmt.Println(log...)
@@ -114,7 +114,9 @@ func getWorkingDir(main string, sub string) string {
 func makeFIFO(file string) *os.File {
 	if _, err := os.Stat(file); err == nil {
 		fmt.Println("FIFO already exists. Unlink or exit")
-		fmt.Println("If you run multiple connection with the same name you're gonna have a bad time")
+		fmt.Println(
+			"If you run multiple connection with the same name you're gonna have a bad time",
+		)
 		fmt.Print("Type YES to unlink and recreate: ")
 		i := bufio.NewReader(os.Stdin)
 		a, err := i.ReadString('\n')
@@ -127,7 +129,7 @@ func makeFIFO(file string) *os.File {
 		checkError(errUn)
 		debugLog(file, "unlinked")
 	}
-	err := syscall.Mkfifo(file, 0644)
+	err := syscall.Mkfifo(file, 0o644)
 	checkError(err)
 	debugLog("FIFO created as", file)
 	f, err := os.OpenFile(file, os.O_RDONLY|syscall.O_NONBLOCK, os.ModeNamedPipe)
@@ -140,7 +142,7 @@ func makeOut(file string) *os.File {
 	if _, err := os.Stat(file); err == nil {
 		fmt.Printf("Warning: %v already exists; appending.\n", file)
 	}
-	out, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	out, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o666)
 	checkError(err)
 	debugLog("logfile created as", out.Name())
 	return out
@@ -283,7 +285,7 @@ func main() {
 
 	// Make and move to working directory
 	workingDir := getWorkingDir(baseDir, server.name)
-	errMk := os.MkdirAll(workingDir, 0755)
+	errMk := os.MkdirAll(workingDir, 0o755)
 	checkError(errMk)
 
 	errCh := os.Chdir(workingDir)
