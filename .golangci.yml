@@ -1,15 +1,10 @@
 ---
+version: "2"
 linters:
+  default: all
+formatters:
   enable:
-    - exportloopref
-    - gocritic
-    - ineffassign
-    - misspell
-    - prealloc
-    - unconvert
-    - unparam
+    - gofmt
+    - gofumpt
     - goimports
-    - whitespace
-    - revive
-    - errcheck
-    - nilerr
+    - golines
