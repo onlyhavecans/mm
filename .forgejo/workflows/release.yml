@@ -22,10 +22,10 @@ jobs:
           go-version: stable
 
       - name: Run GoReleaser
-        uses: https://github.com/goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a  # v6
+        uses: actions/goreleaser@e435ccd777264be153ace6237001ef4d979d3a7a  # v6
         with:
           distribution: goreleaser
-          version: '~> 2'
+          version: v2.11  # renovate datasource=github-releases depName=goreleaser/goreleaser
           args: release --clean
         env:
           GORELEASER_FORCE_TOKEN: gitea
