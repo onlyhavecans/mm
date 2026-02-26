@@ -12,20 +12,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c  # v6
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version: stable
 
       - name: Run GoReleaser
-        uses: actions/goreleaser@ec59f474b9834571250b370d4735c50f8e2d1e29  # v7
+        uses: actions/goreleaser@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           distribution: goreleaser
-          version: v2.11  # renovate datasource=github-releases depName=goreleaser/goreleaser
+          version: v2.11 # renovate datasource=github-releases depName=goreleaser/goreleaser
           args: release --clean
         env:
           GORELEASER_FORCE_TOKEN: gitea
