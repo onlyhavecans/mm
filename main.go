@@ -273,6 +273,8 @@ func closeLog(f *os.File) {
 }
 
 func main() {
+	maybePrintVersion()
+
 	// checkError throws a panic, catch it at the end and return error to user
 	defer func() {
 		if r := recover(); r != nil {

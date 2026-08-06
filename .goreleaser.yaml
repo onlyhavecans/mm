@@ -18,6 +18,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
+      - -X main.version={{.Version}}
     goos:
       - linux
       - darwin
@@ -38,6 +39,15 @@ checksum:
 
 changelog:
   sort: asc
+  groups:
+    - title: Features
+      regexp: '^feat(\(.+\))?!?:'
+      order: 0
+    - title: Bug fixes
+      regexp: '^fix(\(.+\))?!?:'
+      order: 1
+    - title: Others
+      order: 999
   filters:
     exclude:
       - "^docs:"
