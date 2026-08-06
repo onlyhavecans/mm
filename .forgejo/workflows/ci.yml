@@ -1,42 +1,35 @@
 ---
+name: CI
+
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
 
-permissions:
-  contents: read
-  # Optional: allow read access to pull request. Use with `only-new-issues` option.
-  # pull-requests: read
-
 jobs:
-  golangci:
-    name: lint
-    runs-on: ubuntu-latest
+  lint:
+    runs-on: debian-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: "stable"
+          go-version-file: go.mod
 
-      - uses: actions/golangci-lint@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+      - name: golangci-lint
+        uses: actions/golangci-lint@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.12.2 # renovate: datasource=github-releases depName=golangci/golangci-lint
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: debian-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: stable
+          go-version-file: go.mod
 
       - name: Build
-        run: go build -v ./...
-
-      - name: Vet
-        run: go vet ./...
+        run: go build ./...
 
       - name: Test
-        run: go test -v ./...
+        run: go test -race ./...
