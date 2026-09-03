@@ -2,4 +2,4 @@ module onlyhavecans.works/onlyhavecans/mm
 
 go 1.26
 
-toolchain go1.27.0
+toolchain go1.27.1
